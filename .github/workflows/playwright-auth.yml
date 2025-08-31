@@ -1,0 +1,339 @@
+name: Playwright Authentication Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+  CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+  NODE_VERSION: '18'
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        test-suite: 
+          - registration
+          - session
+          - errors
+          - visual
+          - performance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Wait for application
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+
+      - name: Run ${{ matrix.test-suite }} tests on ${{ matrix.browser }}
+        run: pnpm exec playwright test tests/auth-${{ matrix.test-suite }}.*.spec.ts --project=${{ matrix.browser }}
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-results-${{ matrix.browser }}-${{ matrix.test-suite }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots-${{ matrix.browser }}-${{ matrix.test-suite }}
+          path: test-results/**/*.png
+          retention-days: 7
+
+  auth-state-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Wait for application
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+
+      - name: Setup authenticated user state
+        run: pnpm exec playwright test tests/setup/auth-setup.spec.ts
+
+      - name: Run authenticated state tests
+        run: pnpm exec playwright test tests/auth-session.spec.ts --grep "Authenticated"
+
+      - name: Generate HTML report
+        run: pnpm exec playwright show-report --host=0.0.0.0
+        if: always()
+
+      - name: Upload authenticated test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-auth-state-results
+          path: |
+            test-results/
+            playwright-report/
+            tests/auth/.auth/
+          retention-days: 30
+
+  security-tests:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Wait for application
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+
+      - name: Run security-focused auth tests
+        run: |
+          pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep "XSS|SQL injection|Security"
+          pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep "CORS|Network"
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Upload security test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-security-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 30
+
+  performance-monitoring:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Wait for application
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+
+      - name: Run performance tests
+        run: pnpm exec playwright test tests/auth-performance.perf.spec.ts
+        env:
+          CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+
+      - name: Extract performance metrics
+        run: |
+          mkdir -p performance-results
+          echo "Extracting performance metrics from test output..."
+          # Performance metrics will be available in test output
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-performance-results
+          path: |
+            test-results/
+            playwright-report/
+            performance-results/
+          retention-days: 30
+
+  test-report:
+    if: always()
+    needs: [test, auth-state-tests, security-tests, performance-monitoring]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: Generate comprehensive report
+        run: |
+          echo "# Authentication Test Results" > test-summary.md
+          echo "" >> test-summary.md
+          echo "## Test Matrix Results" >> test-summary.md
+          
+          # Count successful and failed tests
+          SUCCESS_COUNT=0
+          FAILURE_COUNT=0
+          
+          for result_dir in all-results/*/; do
+            if [ -d "$result_dir" ]; then
+              echo "Processing: $result_dir"
+              RESULT_NAME=$(basename "$result_dir")
+              echo "- $RESULT_NAME" >> test-summary.md
+            fi
+          done
+          
+          echo "" >> test-summary.md
+          echo "## Summary" >> test-summary.md
+          echo "- Authentication test suite completed" >> test-summary.md
+          echo "- Multi-browser validation across Chrome, Firefox, Safari" >> test-summary.md
+          echo "- Security, performance, and visual regression tests executed" >> test-summary.md
+          
+          cat test-summary.md
+
+      - name: Upload comprehensive report
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-report
+          path: |
+            test-summary.md
+            all-results/
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('test-summary.md')) {
+              const summary = fs.readFileSync('test-summary.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }

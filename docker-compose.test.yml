@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/test.Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=test
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+      - ./tests/auth/.auth:/app/tests/auth/.auth
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  playwright-runner:
+    build:
+      context: .
+      dockerfile: docker/test.Dockerfile
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - PLAYWRIGHT_BASE_URL=http://app:3000
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+      - ./tests:/app/tests
+    command: >
+      sh -c "
+        echo 'Waiting for app to be ready...' &&
+        sleep 10 &&
+        echo 'Running authentication tests...' &&
+        pnpm exec playwright test tests/auth-registration.unauth.spec.ts tests/auth-session.spec.ts
+      "
+
+  security-tester:
+    build:
+      context: .
+      dockerfile: docker/test.Dockerfile
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - PLAYWRIGHT_BASE_URL=http://app:3000
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    command: >
+      sh -c "
+        echo 'Running security tests...' &&
+        pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep 'XSS|SQL|injection'
+      "
+
+  performance-tester:
+    build:
+      context: .
+      dockerfile: docker/test.Dockerfile
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - PLAYWRIGHT_BASE_URL=http://app:3000
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    command: >
+      sh -c "
+        echo 'Running performance tests...' &&
+        pnpm exec playwright test tests/auth-performance.perf.spec.ts
+      "
+
+  visual-tester:
+    build:
+      context: .
+      dockerfile: docker/test.Dockerfile
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - PLAYWRIGHT_BASE_URL=http://app:3000
+    volumes:
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    command: >
+      sh -c "
+        echo 'Running visual regression tests...' &&
+        pnpm exec playwright test tests/auth-visual.visual.spec.ts
+      "
+
+volumes:
+  test-results:
+  playwright-report:
+  auth-state:
