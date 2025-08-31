@@ -5,7 +5,7 @@ import { betterAuthComponent } from "./auth";
 // Get current user preferences
 export const getCurrentUserPreferences = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async ctx => {
     const user = await betterAuthComponent.getAuthUser(ctx);
     if (!user) {
       return null;
@@ -18,7 +18,7 @@ export const getCurrentUserPreferences = query({
 
     return {
       user,
-      preferences
+      preferences,
     };
   },
 });
@@ -65,7 +65,7 @@ export const updateUserPreferences = mutation({
 // Get user tasks
 export const getUserTasks = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async ctx => {
     const user = await betterAuthComponent.getAuthUser(ctx);
     if (!user) {
       return [];

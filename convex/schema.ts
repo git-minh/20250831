@@ -10,7 +10,7 @@ export default defineSchema({
     // Link to Better Auth user via userId string
     userId: v.optional(v.string()),
   }).index("by_user", ["userId"]),
-  
+
   // App-specific user preferences (extends Better Auth user table)
   userPreferences: defineTable({
     userId: v.string(), // References Better Auth user.userId
@@ -20,7 +20,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user_id", ["userId"]),
-  
+
   posts: defineTable({
     title: v.string(),
     content: v.string(),
@@ -28,6 +28,7 @@ export default defineSchema({
     published: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_author", ["authorUserId"])
+  })
+    .index("by_author", ["authorUserId"])
     .index("by_published", ["published"]),
 });

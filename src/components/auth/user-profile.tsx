@@ -17,7 +17,7 @@ import { LogOut, Settings, User } from "lucide-react";
 export function UserProfile() {
   const { data: session, isPending: isLoading } = authClient.useSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  
+
   const isAuthenticated = !!session;
 
   const handleSignOut = async () => {
@@ -32,7 +32,7 @@ export function UserProfile() {
   };
 
   if (isLoading) {
-    return <div className="h-8 w-8 animate-pulse bg-muted rounded-full" />;
+    return <div className="bg-muted h-8 w-8 animate-pulse rounded-full" />;
   }
 
   if (!isAuthenticated) {
@@ -54,10 +54,8 @@ export function UserProfile() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">User</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              user@example.com
-            </p>
+            <p className="text-sm leading-none font-medium">User</p>
+            <p className="text-muted-foreground text-xs leading-none">user@example.com</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

@@ -4,7 +4,7 @@ import { ConvexError, v } from "convex/values";
 // Get all tasks for the authenticated user
 export const getTasks = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async ctx => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       return []; // Return empty array for unauthenticated users
@@ -18,9 +18,9 @@ export const getTasks = query({
 
 // Add a new task (authenticated users only)
 export const addTask = mutation({
-  args: { 
+  args: {
     text: v.string(),
-    isCompleted: v.optional(v.boolean())
+    isCompleted: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -50,7 +50,7 @@ export const toggleTask = mutation({
     if (task === null) {
       throw new ConvexError("Task not found");
     }
-    
+
     await ctx.db.patch(args.id, {
       isCompleted: !task.isCompleted,
     });
