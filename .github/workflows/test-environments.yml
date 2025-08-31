@@ -1,4 +1,4 @@
-name: Multi-Environment Authentication Tests
+name: Environment Tests
 
 on:
   workflow_dispatch:
@@ -12,342 +12,72 @@ on:
           - staging
           - production
           - development
-      test_type:
-        description: 'Test type to run'
-        required: true
-        default: 'full'
-        type: choice
-        options:
-          - full
-          - smoke
-          - security
-          - performance
-          - visual
 
 env:
   NODE_VERSION: '18'
 
 jobs:
-  environment-setup:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      convex_deployment: ${{ steps.env-config.outputs.convex_deployment }}
-      convex_site_url: ${{ steps.env-config.outputs.convex_site_url }}
-      test_timeout: ${{ steps.env-config.outputs.test_timeout }}
+    timeout-minutes: 30
     
     steps:
-      - name: Configure environment variables
-        id: env-config
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Configure environment
         run: |
           case "${{ github.event.inputs.environment }}" in
             "production")
-              echo "convex_deployment=${{ secrets.CONVEX_DEPLOYMENT_PROD }}" >> $GITHUB_OUTPUT
-              echo "convex_site_url=${{ secrets.CONVEX_SITE_URL_PROD }}" >> $GITHUB_OUTPUT
-              echo "test_timeout=120" >> $GITHUB_OUTPUT
+              echo "CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT_PROD }}" >> $GITHUB_ENV
+              echo "CONVEX_SITE_URL=${{ secrets.CONVEX_SITE_URL_PROD }}" >> $GITHUB_ENV
               ;;
             "staging")
-              echo "convex_deployment=${{ secrets.CONVEX_DEPLOYMENT_STAGING }}" >> $GITHUB_OUTPUT
-              echo "convex_site_url=${{ secrets.CONVEX_SITE_URL_STAGING }}" >> $GITHUB_OUTPUT
-              echo "test_timeout=90" >> $GITHUB_OUTPUT
+              echo "CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT_STAGING }}" >> $GITHUB_ENV
+              echo "CONVEX_SITE_URL=${{ secrets.CONVEX_SITE_URL_STAGING }}" >> $GITHUB_ENV
               ;;
             "development")
-              echo "convex_deployment=${{ secrets.CONVEX_DEPLOYMENT_DEV }}" >> $GITHUB_OUTPUT
-              echo "convex_site_url=${{ secrets.CONVEX_SITE_URL_DEV }}" >> $GITHUB_OUTPUT
-              echo "test_timeout=60" >> $GITHUB_OUTPUT
+              echo "CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT_DEV }}" >> $GITHUB_ENV
+              echo "CONVEX_SITE_URL=${{ secrets.CONVEX_SITE_URL_DEV }}" >> $GITHUB_ENV
               ;;
           esac
 
-  smoke-tests:
-    if: github.event.inputs.test_type == 'smoke' || github.event.inputs.test_type == 'full'
-    needs: environment-setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Build application
         run: pnpm run build
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
 
       - name: Start application
         run: pnpm start &
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
 
       - name: Wait for application
         run: |
           timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
 
-      - name: Run smoke tests
-        run: |
-          pnpm exec playwright test tests/auth-registration.unauth.spec.ts --grep "should successfully register new user"
-          pnpm exec playwright test tests/auth-session.spec.ts --grep "should login existing user"
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
+      - name: Run tests
+        run: pnpm test
 
-      - name: Upload smoke test results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smoke-test-results-${{ github.event.inputs.environment }}
+          name: test-results-${{ github.event.inputs.environment }}
           path: |
             test-results/
             playwright-report/
-
-  security-tests:
-    if: github.event.inputs.test_type == 'security' || github.event.inputs.test_type == 'full'
-    needs: environment-setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build application
-        run: pnpm run build
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Start application
-        run: pnpm start &
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Wait for application
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
-
-      - name: Run comprehensive security tests
-        run: |
-          pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep "XSS|SQL|injection|malformed|CORS"
-          pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep "Network and Server Errors"
-          pnpm exec playwright test tests/auth-errors.unauth.spec.ts --grep "Input Validation and Sanitization"
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Generate security report
-        run: |
-          echo "# Security Test Report - ${{ github.event.inputs.environment }}" > security-report.md
-          echo "" >> security-report.md
-          echo "## Test Results" >> security-report.md
-          echo "- XSS Prevention: Tests executed" >> security-report.md
-          echo "- SQL Injection Prevention: Tests executed" >> security-report.md
-          echo "- Input Validation: Tests executed" >> security-report.md
-          echo "- Network Security: Tests executed" >> security-report.md
-
-      - name: Upload security test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-test-results-${{ github.event.inputs.environment }}
-          path: |
-            test-results/
-            playwright-report/
-            security-report.md
-
-  performance-tests:
-    if: github.event.inputs.test_type == 'performance' || github.event.inputs.test_type == 'full'
-    needs: environment-setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build application
-        run: pnpm run build
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Start application
-        run: pnpm start &
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Wait for application
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
-
-      - name: Run performance tests
-        run: pnpm exec playwright test tests/auth-performance.perf.spec.ts
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Extract performance metrics
-        run: |
-          mkdir -p performance-results
-          # Extract timing data from test output
-          echo "Performance test completed for ${{ github.event.inputs.environment }}" > performance-results/summary.txt
-          echo "Environment: ${{ github.event.inputs.environment }}" >> performance-results/summary.txt
-          echo "Timestamp: $(date)" >> performance-results/summary.txt
-
-      - name: Upload performance test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: performance-test-results-${{ github.event.inputs.environment }}
-          path: |
-            test-results/
-            playwright-report/
-            performance-results/
-
-  visual-tests:
-    if: github.event.inputs.test_type == 'visual' || github.event.inputs.test_type == 'full'
-    needs: environment-setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build application
-        run: pnpm run build
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Start application
-        run: pnpm start &
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Wait for application
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
-
-      - name: Run visual regression tests
-        run: pnpm exec playwright test tests/auth-visual.visual.spec.ts
-        env:
-          CONVEX_DEPLOYMENT: ${{ needs.environment-setup.outputs.convex_deployment }}
-          CONVEX_SITE_URL: ${{ needs.environment-setup.outputs.convex_site_url }}
-
-      - name: Upload visual test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: visual-test-results-${{ github.event.inputs.environment }}
-          path: |
-            test-results/
-            playwright-report/
-
-  full-suite:
-    if: github.event.inputs.test_type == 'full'
-    needs: [environment-setup, smoke-tests, security-tests, performance-tests, visual-tests]
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download all test results
-        uses: actions/download-artifact@v4
-        with:
-          path: all-test-results
-
-      - name: Generate comprehensive report
-        run: |
-          echo "# Comprehensive Authentication Test Report" > comprehensive-report.md
-          echo "" >> comprehensive-report.md
-          echo "**Environment:** ${{ github.event.inputs.environment }}" >> comprehensive-report.md
-          echo "**Test Type:** ${{ github.event.inputs.test_type }}" >> comprehensive-report.md
-          echo "**Date:** $(date)" >> comprehensive-report.md
-          echo "" >> comprehensive-report.md
-          echo "## Test Categories Completed" >> comprehensive-report.md
-          echo "- ✅ Smoke Tests" >> comprehensive-report.md
-          echo "- ✅ Security Tests" >> comprehensive-report.md
-          echo "- ✅ Performance Tests" >> comprehensive-report.md
-          echo "- ✅ Visual Regression Tests" >> comprehensive-report.md
-          echo "" >> comprehensive-report.md
-          echo "## Summary" >> comprehensive-report.md
-          echo "All authentication test categories completed successfully for the ${{ github.event.inputs.environment }} environment." >> comprehensive-report.md
-          
-          cat comprehensive-report.md
-
-      - name: Upload comprehensive report
-        uses: actions/upload-artifact@v4
-        with:
-          name: comprehensive-test-report-${{ github.event.inputs.environment }}
-          path: |
-            comprehensive-report.md
-            all-test-results/
+          retention-days: 7

@@ -49,9 +49,9 @@ export function SigninForm({ className, onSuccess, onSwitchToSignUp, ...props }:
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col gap-6", className)} {...props}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Welcome back</h1>
+        <h1 className="text-2xl font-bold">Sign in to your account</h1>
         <p className="text-muted-foreground text-sm text-balance">
-          Enter your credentials to access your account
+          Enter your email below to access your account
         </p>
       </div>
 

@@ -60,7 +60,7 @@ export function SignupForm({ className, onSuccess, onSwitchToSignIn, ...props }:
 
   if (success) {
     return (
-      <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <div className={cn("flex flex-col gap-6", className)}>
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <CheckCircle className="h-6 w-6 text-green-600" />
@@ -79,9 +79,9 @@ export function SignupForm({ className, onSuccess, onSwitchToSignIn, ...props }:
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col gap-6", className)} {...props}>
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Create your account</h1>
+        <h1 className="text-2xl font-bold">Create an account</h1>
         <p className="text-muted-foreground text-sm text-balance">
-          Enter your details below to get started
+          Enter your details below to create your account
         </p>
       </div>
 

@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Modern Fullstack Boilerplate
 
-## Getting Started
+A clean, production-ready fullstack boilerplate with authentication, built with Next.js 15, React 19, and Convex.
 
-First, run the development server:
+## Features
+
+- **🚀 Modern Stack**: Next.js 15 + React 19 + TypeScript + Tailwind CSS
+- **🔐 Authentication**: Convex + Better Auth with modal-based flow
+- **📱 Responsive**: Mobile-first design with dark mode support  
+- **🧪 Testing**: Playwright E2E tests with minimal configuration
+- **⚡ Performance**: Turbopack, optimized builds, fast development
+- **🎨 UI Components**: Shadcn/ui + Radix UI primitives
+
+## Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Install dependencies
+pnpm install
+
+# Set up environment
+cp .env.example .env.local
+# Add your Convex deployment URL and site URL
+
+# Run development server
 pnpm dev
-# or
-bun dev
+
+# Open http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+src/
+├── app/
+│   ├── api/            # API routes  
+│   ├── dashboard/      # Protected dashboard
+│   └── page.tsx       # Landing page with modal auth
+├── components/
+│   ├── auth/          # Authentication components
+│   └── ui/           # Reusable UI components
+└── lib/              # Utilities and configurations
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+tests/
+├── auth-flow.spec.ts  # E2E authentication tests
+└── utils/            # Test helpers
+```
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm dev         # Start development server
+pnpm build       # Build for production  
+pnpm start       # Start production server
+pnpm lint        # Run ESLint
+pnpm type-check  # TypeScript checking
+pnpm test        # Run Playwright tests
+pnpm test:ui     # Interactive test runner
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Authentication Flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Minimalist Design**: Landing page → Modal auth → Dashboard
 
-## Deploy on Vercel
+- **Landing Page**: Hero with "Get Started" and "Sign In" buttons
+- **Modal Authentication**: Seamless signup/signin without page navigation
+- **Protected Routes**: Dashboard accessible only after authentication
+- **Session Management**: Persistent authentication across browser sessions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Technology Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Convex (serverless database + functions)  
+- **Authentication**: Better Auth + Convex integration
+- **UI Components**: Shadcn/ui + Radix UI
+- **Testing**: Playwright E2E tests
+- **Deployment**: Vercel (recommended)
+
+## Environment Variables
+
+```bash
+# Required for Convex
+CONVEX_DEPLOYMENT=your-deployment-id
+CONVEX_SITE_URL=https://your-site-url
+```
+
+## Development
+
+The project uses **pnpm** for package management and modern tooling:
+
+- **Turbopack** for fast development builds
+- **ESLint + Prettier** for code quality  
+- **Playwright** for E2E testing
+- **GitHub Actions** for CI/CD
+
+## Testing
+
+Run the authentication flow tests:
+
+```bash
+# Run all tests
+pnpm test
+
+# Interactive test runner  
+pnpm test:ui
+
+# Specific browser
+pnpm exec playwright test --project=chromium
+```
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Manual Deployment
+
+```bash
+pnpm build
+pnpm start
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `pnpm test`
+5. Submit a pull request
+
+## License
+
+MIT
