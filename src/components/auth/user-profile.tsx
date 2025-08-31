@@ -1,7 +1,7 @@
 "use client";
 
-import { useAuthActions } from "@convex-dev/better-auth/react";
-import { useConvexAuth } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -15,8 +15,21 @@ import {
 import { LogOut, Settings, User } from "lucide-react";
 
 export function UserProfile() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const { signOut } = useAuthActions();
+  const { data: session, isPending: isLoading } = authClient.useSession();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  
+  const isAuthenticated = !!session;
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      await authClient.signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   if (isLoading) {
     return <div className="h-8 w-8 animate-pulse bg-muted rounded-full" />;
@@ -53,9 +66,9 @@ export function UserProfile() {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()}>
+        <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign out</span>
+          <span>{isSigningOut ? "Signing out..." : "Sign out"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,79 +1,101 @@
 import { query, mutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
+import { betterAuthComponent } from "./auth";
 
-// Get current user profile
-export const getCurrentUser = query({
+// Get current user preferences
+export const getCurrentUserPreferences = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const user = await betterAuthComponent.getAuthUser(ctx);
+    if (!user) {
       return null;
     }
 
-    const user = await ctx.db
-      .query("users")
-      .filter(q => q.eq(q.field("email"), identity.email))
+    const preferences = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user_id", q => q.eq("userId", (user as any).id))
       .first();
 
-    return user;
+    return {
+      user,
+      preferences
+    };
   },
 });
 
-// Get user by ID
-export const getUserById = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    return await ctx.db.get(args.userId);
-  },
-});
-
-// Update user profile
-export const updateProfile = mutation({
+// Update user preferences
+export const updateUserPreferences = mutation({
   args: {
-    name: v.optional(v.string()),
-    preferences: v.optional(v.object({
-      theme: v.optional(v.string()),
-      notifications: v.optional(v.boolean()),
-    })),
+    theme: v.optional(v.string()),
+    notifications: v.optional(v.boolean()),
+    language: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const user = await betterAuthComponent.getAuthUser(ctx);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .filter(q => q.eq(q.field("email"), identity.email))
+    const existingPreferences = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user_id", q => q.eq("userId", (user as any).id))
       .first();
 
-    if (!user) {
-      throw new ConvexError("User not found");
+    if (existingPreferences) {
+      await ctx.db.patch(existingPreferences._id, {
+        ...args,
+        updatedAt: Date.now(),
+      });
+      return existingPreferences._id;
+    } else {
+      // Create new preferences if they don't exist
+      const preferencesId = await ctx.db.insert("userPreferences", {
+        userId: (user as any).id,
+        theme: args.theme || "system",
+        notifications: args.notifications ?? true,
+        language: args.language || "en",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return preferencesId;
     }
-
-    await ctx.db.patch(user._id, {
-      ...args,
-      updatedAt: Date.now(),
-    });
-
-    return user._id;
   },
 });
 
-// Get all users (for admin purposes)
-export const getAllUsers = query({
+// Get user tasks
+export const getUserTasks = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const user = await betterAuthComponent.getAuthUser(ctx);
+    if (!user) {
+      return [];
+    }
+
+    return await ctx.db
+      .query("tasks")
+      .withIndex("by_user", q => q.eq("userId", (user as any).id))
+      .collect();
+  },
+});
+
+// Create a new task
+export const createTask = mutation({
+  args: {
+    text: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await betterAuthComponent.getAuthUser(ctx);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 
-    return await ctx.db.query("users").collect();
+    const taskId = await ctx.db.insert("tasks", {
+      text: args.text,
+      isCompleted: false,
+      userId: (user as any).id,
+      createdAt: Date.now(),
+    });
+
+    return taskId;
   },
 });

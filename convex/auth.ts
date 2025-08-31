@@ -32,8 +32,9 @@ export const {
     // Must create a user and return the user id
     onCreateUser: async (ctx, user) => {
       // Create user preferences for the new user
+      // Note: Better Auth manages user IDs internally, we just need to return something
       const userId = await ctx.db.insert("userPreferences", {
-        userId: user.userId || "",
+        userId: (user as any).id || "",
         theme: "system",
         notifications: true,
         language: "en",
