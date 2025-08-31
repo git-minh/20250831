@@ -62,6 +62,16 @@ export default defineConfig({
     },
 
     {
+      name: "chromium-no-auth",
+      use: {
+        ...devices["Desktop Chrome"],
+        // No auth state - for full cycle tests
+        storageState: undefined,
+      },
+      // No dependencies on setup
+    },
+
+    {
       name: "firefox",
       use: {
         ...devices["Desktop Firefox"],

@@ -50,3 +50,39 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Testing
+/coverage/
+*.png
+*.webm
+auth-*.png
+unexpected-state.png
+test-full-auth-cycle.js
+manual-logout-test.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+
+# Auth test files
+/tests/auth/.auth/
+
+# Convex
+.env.local
+/convex/_generated
